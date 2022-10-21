@@ -13,8 +13,11 @@ import {
   toMetaplexFileFromBrowser,
   findMetadataPda,
   keypairIdentity,
+  toMetaplexFileFromJson,
 } from "@metaplex-foundation/js"
-
+import { awsStorage } from "@metaplex-foundation/js-plugin-aws"
+import { S3Client } from "@aws-sdk/client-s3"
+11
 import {
   Button,
   Flex,
@@ -60,14 +63,40 @@ export const CreatePromo: FC = () => {
     "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
   )
 
+  // const awsClient = new S3Client({
+  //   region: "us-east-1",
+  //   credentials: {
+  //     accessKeyId: "AKIA4NT6BEVPPTNIXHX6",
+  //     secretAccessKey: "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",
+  //   },
+  // })
+
+  // // metaplex setup
+  // const metaplex = Metaplex.make(connection).use(
+  //   awsStorage(awsClient, "metaplex-test-upload")
+  // )
+
+  const awsClient = new S3Client({
+    region: "us-east-1",
+    credentials: {
+      accessKeyId: process.env.NEXT_PUBLIC_ACCESS_KEY_ID,
+      secretAccessKey: process.env.NEXT_PUBLIC_SECRET_ACCESS_KEY,
+    },
+  })
+
   // set up metaplex object
   const metaplex = new Metaplex(connection).use(
-    bundlrStorage({
-      address: "https://devnet.bundlr.network",
-      providerUrl: "https://api.devnet.solana.com",
-      timeout: 60000,
-    })
+    awsStorage(awsClient, process.env.NEXT_PUBLIC_AWS_BUCKET_NAME)
   )
+
+  // // set up metaplex object
+  // const metaplex = new Metaplex(connection).use(
+  //   bundlrStorage({
+  //     address: "https://devnet.bundlr.network",
+  //     providerUrl: "https://api.devnet.solana.com",
+  //     timeout: 60000,
+  //   })
+  // )
 
   if (keypair) {
     metaplex.use(keypairIdentity(keypair))
@@ -77,7 +106,10 @@ export const CreatePromo: FC = () => {
   const handleImage = async (event) => {
     try {
       const file: MetaplexFile = await toMetaplexFileFromBrowser(
-        event.target.files[0]
+        event.target.files[0],
+        {
+          uniqueName: "TEST",
+        }
       )
 
       const imageUrl = await metaplex.storage().upload(file)
@@ -105,9 +137,17 @@ export const CreatePromo: FC = () => {
         },
       ],
     }
-    const { uri } = await metaplex.nfts().uploadMetadata(data).run()
-    setMetadataUrl(uri)
-    console.log("metadata:", uri)
+
+    const file: MetaplexFile = await toMetaplexFileFromJson(data, "", {
+      uniqueName: "TEST-METADATA",
+    })
+
+    const metadataUrl = await metaplex.storage().upload(file)
+    console.log(metadataUrl)
+
+    // const { uri } = await metaplex.nfts().uploadMetadata(data).run()
+    // setMetadataUrl(uri)
+    // console.log("metadata:", uri)
   }
 
   // build and send transaction
